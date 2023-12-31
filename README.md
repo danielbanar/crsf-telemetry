@@ -1,4 +1,4 @@
-Simple c++ code that allows you to read ELRS crsf telemetry data from your flight controller
+Simple c++ code that allows you to read ELRS crsf telemetry data from your flight controller    
 Example output:
 Gyro:   P0.2 R20.0   Y53.4
 BATTERY_SENSOR: 16.2V   0.2A    521mAh  75%
