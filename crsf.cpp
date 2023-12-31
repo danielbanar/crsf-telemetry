@@ -3,10 +3,15 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <fcntl.h>   // Contains file controls like O_RDWR
-#include <errno.h>   // Error integer and strerror() function
-#include <termios.h> // Contains POSIX terminal control definitions
-#include <unistd.h>  // write(), read(), close()
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#include <errno.h> /* Error number definitions */
+#include "/usr/include/asm-generic/termbits.h"
+#include "/usr/include/asm-generic/ioctls.h"
+#include <errno.h>  // Error integer and strerror() function
+#include <unistd.h> // write(), read(), close()
 #include <cmath>
 #define RADTODEG(radians) ((radians) * (180.0 / M_PI))
 #define RA
@@ -108,47 +113,25 @@ void CheckPayloads(std::vector<uint8_t> &buffer)
 }
 int main()
 {
-  int serial_port = open("/dev/ttyS0", O_RDWR|O_NOCTTY);
+  int serial_port = open("/dev/ttyS0", O_RDWR);
+  int speed = 420000;
+  struct termios2 tio;
+  ioctl(serial_port, TCGETS2, &tio);
+  tio.c_cflag &= ~CBAUD;
+  tio.c_cflag |= BOTHER;
+  tio.c_ispeed = speed;
+  tio.c_ospeed = speed;
+  tio.c_cc[VTIME] = 10; // Wait for up to 1s (10 deciseconds), returning as soon as any data is received.
+  tio.c_cc[VMIN] = 64;
 
-  struct termios tty;
+  tio.c_cflag = 7344;
+  tio.c_iflag = 0;
+  tio.c_oflag = 0;
+  tio.c_lflag = 0;
 
-  // Read in existing settings, and handle any error
-  if (tcgetattr(serial_port, &tty) != 0)
-  {
-    printf("Error %i from tcgetattr: %s\n", errno, strerror(errno));
-    return 1;
-  }
+  if (ioctl(serial_port, TCSETS2, &tio) != 0)
+    printf("serial error");
 
-  tty.c_cflag &= ~PARENB;        // Clear parity bit, disabling parity (most common)
-  tty.c_cflag &= ~CSTOPB;        // Clear stop field, only one stop bit used in communication (most common)
-  tty.c_cflag &= ~CSIZE;         // Clear all bits that set the data size
-  tty.c_cflag |= CS8;            // 8 bits per byte (most common)
-  tty.c_cflag &= ~CRTSCTS;       // Disable RTS/CTS hardware flow control (most common)
-  tty.c_cflag |= CREAD | CLOCAL; // Turn on READ & ignore ctrl lines (CLOCAL = 1)
-
-  tty.c_lflag &= ~ICANON;
-  tty.c_lflag &= ~ECHO;                                                        // Disable echo
-  tty.c_lflag &= ~ECHOE;                                                       // Disable erasure
-  tty.c_lflag &= ~ECHONL;                                                      // Disable new-line echo
-  tty.c_lflag &= ~ISIG;                                                        // Disable interpretation of INTR, QUIT and SUSP
-  tty.c_iflag &= ~(IXON | IXOFF | IXANY);                                      // Turn off s/w flow ctrl
-  tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL); // Disable any special handling of received bytes
-
-  tty.c_oflag &= ~OPOST; // Prevent special interpretation of output bytes (e.g. newline chars)
-  tty.c_oflag &= ~ONLCR; // Prevent conversion of newline to carriage return/line feed
-  tty.c_cc[VTIME] = 10;  // Wait for up to 1s (10 deciseconds), returning as soon as any data is received.
-  tty.c_cc[VMIN] = 64;
-
-  // Crossfire baud rate
-  cfsetispeed(&tty, 420000);
-  cfsetospeed(&tty, 420000);
-
-  // Save tty settings, also checking for error
-  if (tcsetattr(serial_port, TCSANOW, &tty) != 0)
-  {
-    printf("Error %i from tcsetattr: %s\n", errno, strerror(errno));
-    return 1;
-  }
   while (true)
   {
     uint8_t read_buf[128] = {0};
