@@ -10,12 +10,30 @@
 
 void ProcessPayload(std::vector<uint8_t> payload)
 {
-  printf("Payload: ");
+  printf("Raw: ");
   for (uint8_t byte : payload)
   {
     printf("%02x ", static_cast<unsigned char>(byte));
   }
   printf("\n");
+  if (payload[0] == 0x08) // CRSF_FRAMETYPE_BATTERY_SENSOR
+  {
+    uint16_t voltage = (payload[1] << 8) | payload[2];
+    uint16_t current = (payload[3] << 8) | payload[4];
+    uint32_t capacity = (payload[5] << 16) | (payload[6] << 8) | payload[7];
+    uint8_t remaining = payload[8];
+    printf("BATTERY_SENSOR: %.1fV\t%.1fA\t%dmAh\t%d%%\n", ((float)voltage) / 10, ((float)current) / 10, capacity, remaining);
+  }
+  else if (payload[0] == 0x02) // CRSF_FRAMETYPE_GPS
+  {
+    int32_t latitude = (payload[1] << 24) | (payload[2] << 16) | (payload[3] << 8) | payload[4];     // degree / 10,000,000 big endian
+    int32_t longitude = (payload[5] << 24) | (payload[6] << 16) | (payload[7] << 8) | payload[8];;    // degree / 10,000,000 big endian
+    uint16_t groundspeed = (payload[9] << 8) | payload[10]; // km/h / 10 big endian
+    uint16_t heading = (payload[11] << 8) | payload[12];     // GPS heading, degree/100 big endian
+    uint16_t altitude = (payload[13] << 8) | payload[14];    // meters, +1000m big endian
+    uint8_t satellites = payload[15];   // satellites
+    printf("GPS: Lat: %d\tLon: %d\tGspd: %d\tHdg: %d\tAlt: %d\tSat: %d\n", latitude,longitude,groundspeed,heading,altitude,satellites);
+  }
 }
 void CheckPayloads(std::vector<uint8_t> &buffer)
 {
@@ -32,7 +50,7 @@ void CheckPayloads(std::vector<uint8_t> &buffer)
         break;
       }
     }
-    //if Start byte not found return and read from serial
+    // if Start byte not found return and read from serial
     if (start == -1)
       return;
 
@@ -101,7 +119,7 @@ int main()
     int read_bytes = read(serial_port, &read_buf, sizeof(read_buf));
     static std::vector<uint8_t> buffer;
     buffer.insert(buffer.end(), &read_buf[0], &read_buf[read_bytes]);
-    std::cout << buffer.size() << std::endl;
+    printf("Buffer size: %d\n", buffer.size());
     CheckPayloads(buffer);
   }
   close(serial_port);
