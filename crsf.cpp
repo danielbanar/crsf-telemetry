@@ -7,14 +7,13 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
-#include <errno.h> /* Error number definitions */
+#include <errno.h>
 #include "/usr/include/asm-generic/termbits.h"
 #include "/usr/include/asm-generic/ioctls.h"
-#include <errno.h>  // Error integer and strerror() function
-#include <unistd.h> // write(), read(), close()
+#include <errno.h>
+#include <unistd.h>
 #include <cmath>
 #define RADTODEG(radians) ((radians) * (180.0 / M_PI))
-#define RA
 void ProcessPayload(std::vector<uint8_t> payload)
 {
 #ifdef RAW
@@ -114,14 +113,14 @@ void CheckPayloads(std::vector<uint8_t> &buffer)
 int main()
 {
   int serial_port = open("/dev/ttyS0", O_RDWR);
-  int speed = 420000;
+  int baudrate = 420000;
   struct termios2 tio;
   ioctl(serial_port, TCGETS2, &tio);
   tio.c_cflag &= ~CBAUD;
   tio.c_cflag |= BOTHER;
-  tio.c_ispeed = speed;
-  tio.c_ospeed = speed;
-  tio.c_cc[VTIME] = 10; // Wait for up to 1s (10 deciseconds), returning as soon as any data is received.
+  tio.c_ispeed = baudrate;
+  tio.c_ospeed = baudrate;
+  tio.c_cc[VTIME] = 10;
   tio.c_cc[VMIN] = 64;
 
   tio.c_cflag = 7344;
@@ -142,5 +141,5 @@ int main()
     CheckPayloads(buffer);
   }
   close(serial_port);
-  return 0; // success
+  return 0;
 };
