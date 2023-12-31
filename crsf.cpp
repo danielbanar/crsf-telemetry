@@ -17,7 +17,41 @@ void ProcessPayload(std::vector<uint8_t> payload)
   }
   printf("\n");
 }
+void CheckPayloads(std::vector<uint8_t> &buffer)
+{
+  while (true)
+  {
+    // Start Byte
+    size_t start = -1;
+    // Scan for Start byte
+    for (int i = 0; i < buffer.size(); i++)
+    {
+      if (buffer[i] == 0xC8)
+      {
+        start = i;
+        break;
+      }
+    }
+    //if Start byte not found return and read from serial
+    if (start == -1)
+      return;
 
+    // Trim to start byte
+    buffer.erase(buffer.begin(), buffer.begin() + start);
+
+    // Check for payload size - aka anti out of bounds - aka sync byte is last byte in buffer
+    if (buffer.size() < 2)
+      return;
+    size_t payload_length = buffer[1];
+    // Check if entire payload is in buffer / aka anti out of bounds
+    if (buffer.size() < payload_length + 2)
+      return;
+    // YES we have entire payload in buffer
+    // Process it and remove from buffer
+    ProcessPayload((std::vector<uint8_t>(buffer.begin() + 2, buffer.begin() + payload_length + 2)));
+    buffer.erase(buffer.begin(), buffer.begin() + payload_length + 2);
+  }
+}
 int main()
 {
   int serial_port = open("/dev/ttyS0", O_RDWR);
@@ -68,33 +102,7 @@ int main()
     static std::vector<uint8_t> buffer;
     buffer.insert(buffer.end(), &read_buf[0], &read_buf[read_bytes]);
     std::cout << buffer.size() << std::endl;
-    // Start Byte
-    size_t start = -1;
-    for (int i = 0; i < buffer.size(); i++)
-    {
-      if (buffer[i] == 0xC8)
-      {
-        start = i;
-        break;
-      }
-    }
-    if (start == -1)
-      continue;
-
-    // Trim to start byte
-    buffer.erase(buffer.begin(), buffer.begin() + start);
-
-    // Check for payload size - aka anti out of bounds - aka sync byte is last byte in buffer
-    if (buffer.size() < 2)
-      continue;
-    size_t payload_length = buffer[1];
-    // Check if entire payload is in buffer / aka anti out of bounds
-    if (buffer.size() < payload_length + 2)
-      continue;
-    // YES we have entire payload in buffer
-    //Process it and remove from buffer
-    ProcessPayload((std::vector<uint8_t> (buffer.begin()+2, buffer.begin() + payload_length + 2)));
-    buffer.erase(buffer.begin(), buffer.begin() + payload_length + 2);
+    CheckPayloads(buffer);
   }
   close(serial_port);
   return 0; // success
